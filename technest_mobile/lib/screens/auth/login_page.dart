@@ -172,8 +172,6 @@ class _LoginPageState extends State<LoginPage>
                   child: Column(
                     children: [
                       const SizedBox(height: 30),
-                      _buildLogo(),
-                      const SizedBox(height: 16),
                       _buildBrandText(),
                       const SizedBox(height: 40),
                       _buildLoginCard(),
@@ -187,30 +185,6 @@ class _LoginPageState extends State<LoginPage>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLogo() {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryLight],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
-            blurRadius: 30,
-            spreadRadius: 5,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: const Icon(Icons.computer, size: 44, color: AppColors.white),
     );
   }
 
