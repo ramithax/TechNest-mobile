@@ -1,28 +1,30 @@
-name: technest_app
-description: A Tech Hardware Store App
-
+name: technest_mobile
+description: "A new Flutter project."
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ^3.13.3
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
-  flutter_svg: ^2.0.9
+
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.1
+  dio: ^5.11.1
+  shared_preferences: ^2.5.5
+  provider: ^6.1.5+1
+  video_player: ^2.14.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
-  
-  # Add this if you have images
-  # assets:
-  #   - assets/images/
+
+  assets:
+    - assets/clip/
