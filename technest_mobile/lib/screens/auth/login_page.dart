@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../home/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -42,6 +43,8 @@ class _LoginPageState extends State<LoginPage>
           ..play();
 
         setState(() {});
+      }).catchError((error) {
+        debugPrint('Login video error: $error');
       });
 
     _animationController = AnimationController(
@@ -92,15 +95,10 @@ class _LoginPageState extends State<LoginPage>
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful'),
-          duration: Duration(seconds: 2),
-        ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
       );
-
-      // Navigation to HomePage will be added after
-      // we confirm the authentication flow works.
     } catch (e) {
       if (!mounted) return;
 
