@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,10 +17,12 @@ class _LoginPageState extends State<LoginPage>
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService();
 
   bool isPasswordVisible = false;
   bool rememberMe = false;
   bool isLoading = false;
+
   late VideoPlayerController _videoController;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -29,17 +32,18 @@ class _LoginPageState extends State<LoginPage>
   void initState() {
     super.initState();
 
-    // Initialize video controller
     _videoController = VideoPlayerController.asset('assets/clip/loginpage.mp4')
       ..initialize().then((_) {
+        if (!mounted) return;
+
         _videoController
           ..setLooping(true)
           ..setVolume(0)
           ..play();
+
         setState(() {});
       });
 
-    // Initialize animations
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -72,26 +76,49 @@ class _LoginPageState extends State<LoginPage>
   Future<void> login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+    });
 
     final email = emailController.text.trim();
     final password = passwordController.text;
 
-    print('Email: $email');
-    print('Password: $password');
+    try {
+      await _authService.login(email: email, password: password);
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
 
-    if (mounted) {
-      setState(() => isLoading = false);
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Navigation to HomePage will be added after
+      // we confirm the authentication flow works.
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       body: Stack(
         children: [
@@ -114,7 +141,7 @@ class _LoginPageState extends State<LoginPage>
             child: Container(color: Colors.black.withOpacity(0.65)),
           ),
 
-          // Decorative background elements (optional - adds subtle glow)
+          // Decorative background elements
           Positioned.fill(
             child: Stack(
               children: [
@@ -251,27 +278,35 @@ class _LoginPageState extends State<LoginPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Text(
-              'Welcome Back',
-              style: GoogleFonts.poppins(
-                fontSize: 26,
-                fontWeight: FontWeight.w500,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Login to continue to TechNest',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: Colors.white54,
+            // Header (Centered)
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'Welcome Back',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Login to continue to TechNest',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 32),
 
-            // Email field
+            // Email
             _buildTextField(
               controller: emailController,
               label: 'Email Address',
@@ -282,16 +317,19 @@ class _LoginPageState extends State<LoginPage>
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
+
                 if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                     .hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
+
                 return null;
               },
             ),
+
             const SizedBox(height: 20),
 
-            // Password field
+            // Password
             _buildTextField(
               controller: passwordController,
               label: 'Password',
@@ -316,15 +354,18 @@ class _LoginPageState extends State<LoginPage>
                 if (value == null || value.isEmpty) {
                   return 'Please enter your password';
                 }
+
                 if (value.length < 6) {
                   return 'Password must be at least 6 characters';
                 }
+
                 return null;
               },
             ),
+
             const SizedBox(height: 16),
 
-            // Remember me & Forgot password
+            // Remember me + forgot password
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -390,6 +431,7 @@ class _LoginPageState extends State<LoginPage>
                 ),
               ],
             ),
+
             const SizedBox(height: 28),
 
             // Login button
@@ -440,6 +482,7 @@ class _LoginPageState extends State<LoginPage>
                       ),
               ),
             ),
+
             const SizedBox(height: 24),
 
             // Divider
@@ -471,9 +514,10 @@ class _LoginPageState extends State<LoginPage>
                 ),
               ],
             ),
+
             const SizedBox(height: 24),
 
-            // Social login buttons
+            // Social login
             Row(
               children: [
                 Expanded(
@@ -493,9 +537,10 @@ class _LoginPageState extends State<LoginPage>
                 ),
               ],
             ),
+
             const SizedBox(height: 24),
 
-            // Register link
+            // Register
             Center(
               child: RichText(
                 text: TextSpan(
