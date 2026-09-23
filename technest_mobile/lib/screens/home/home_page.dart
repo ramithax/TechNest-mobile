@@ -79,6 +79,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _handleBottomNavTap(int index) {
+    if (index == 0) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+      return;
+    }
+
+    void _handleBottomNavTap(int index) {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
+
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   void dispose() {
     _carouselController.dispose();
@@ -108,11 +127,7 @@ class _HomePageState extends State<HomePage> {
       ),
       bottomNavigationBar: TechNestBottomNavBar(
         currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+        onTap: _handleBottomNavTap,
       ),
     );
   }
@@ -350,6 +365,7 @@ class _HomePageState extends State<HomePage> {
               },
               itemBuilder: (context, index) {
                 final category = categories[index];
+
                 return _buildCategoryCard(category);
               },
             ),
