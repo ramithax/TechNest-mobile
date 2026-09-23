@@ -49,17 +49,12 @@ class TechNestBottomNavBar extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag_outlined, size: 22),
             activeIcon: Icon(Icons.shopping_bag, size: 22),
-            label: 'Products',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart_outlined, size: 22),
-            activeIcon: Icon(Icons.shopping_cart, size: 22),
             label: 'Cart',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.favorite_border, size: 22),
             activeIcon: Icon(Icons.favorite, size: 22),
-            label: 'Wishlist',
+            label: 'Pc Builder',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline, size: 22),

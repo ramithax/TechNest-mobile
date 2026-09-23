@@ -228,7 +228,7 @@ class _LoginPageState extends State<LoginPage> {
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
                       fontSize: 24,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: const Color(0xFF1A1A1A),
                     ),
                   ),
@@ -412,7 +412,7 @@ class _LoginPageState extends State<LoginPage> {
                                   'Sign In',
                                   style: GoogleFonts.poppins(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                     color: Colors.white,
                                     letterSpacing: 0.5,
                                   ),
