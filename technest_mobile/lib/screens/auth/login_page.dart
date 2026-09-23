@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:video_player/video_player.dart';
+import 'package:video_player/video_player.dart'; // Added video_player import
 
-import '../../core/constants/app_colors.dart';
 import '../../services/auth_service.dart';
+import '../home/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,8 +12,7 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage>
-    with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -23,53 +22,35 @@ class _LoginPageState extends State<LoginPage>
   bool rememberMe = false;
   bool isLoading = false;
 
+  // 1. Added Video Controller
   late VideoPlayerController _videoController;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
 
+    // 2. Initialize Video
     _videoController = VideoPlayerController.asset('assets/clip/loginpage.mp4')
-      ..initialize().then((_) {
-        if (!mounted) return;
-
-        _videoController
-          ..setLooping(true)
-          ..setVolume(0)
-          ..play();
-
-        setState(() {});
-      });
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-    _animationController.forward();
+      ..initialize()
+          .then((_) {
+            if (!mounted) return;
+            setState(() {
+              _videoController
+                ..setLooping(true)
+                ..setVolume(0)
+                ..play();
+            });
+          })
+          .catchError((error) {
+            debugPrint('Login video error: $error');
+          });
   }
 
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
-    _videoController.dispose();
-    _animationController.dispose();
+    _videoController.dispose(); // 3. Dispose Video
     super.dispose();
   }
 
@@ -92,15 +73,10 @@ class _LoginPageState extends State<LoginPage>
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Login successful'),
-          duration: Duration(seconds: 2),
-        ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
       );
-
-      // Navigation to HomePage will be added after
-      // we confirm the authentication flow works.
     } catch (e) {
       if (!mounted) return;
 
@@ -111,6 +87,7 @@ class _LoginPageState extends State<LoginPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFE74C3C),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -120,9 +97,11 @@ class _LoginPageState extends State<LoginPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // Fallback color while video loads
+      backgroundColor: const Color(0xFFF6F6F6),
       body: Stack(
         children: [
-          // Background video
+          // 4. Background Video Layer
           Positioned.fill(
             child: _videoController.value.isInitialized
                 ? FittedBox(
@@ -133,80 +112,31 @@ class _LoginPageState extends State<LoginPage>
                       child: VideoPlayer(_videoController),
                     ),
                   )
-                : Container(color: AppColors.dark),
-          ),
-
-          // Dark overlay
-          Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.65)),
-          ),
-
-          // Decorative background elements
-          Positioned.fill(
-            child: Stack(
-              children: [
-                // Top-right glowing orb
-                Positioned(
-                  top: -100,
-                  right: -80,
-                  child: Container(
-                    width: 280,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          AppColors.primary.withOpacity(0.15),
-                          AppColors.primary.withOpacity(0.05),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
+                : const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFC29A55)),
                   ),
-                ),
-
-                // Bottom-left glowing orb
-                Positioned(
-                  bottom: -60,
-                  left: -60,
-                  child: Container(
-                    width: 220,
-                    height: 220,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          AppColors.primaryLight.withOpacity(0.1),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
 
-          // Main content
+          // 5. Overlay Layer (Tuned to 0.45 so video shows but white card pops)
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.45)),
+          ),
+
+          // 6. Main Content Layer
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 30),
-                      _buildBrandText(),
-                      const SizedBox(height: 40),
-                      _buildLoginCard(),
-                      const SizedBox(height: 24),
-                      _buildFooter(),
-                    ],
-                  ),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 40),
+                  _buildBrandHeader(),
+                  const SizedBox(height: 40),
+                  _buildLoginCard(),
+                  const SizedBox(height: 24),
+                  _buildFooter(),
+                ],
               ),
             ),
           ),
@@ -215,37 +145,53 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  Widget _buildBrandText() {
+  Widget _buildBrandHeader() {
     return Column(
       children: [
         Text(
           'TECHNEST',
           style: GoogleFonts.poppins(
-            fontSize: 30,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-            letterSpacing: 3,
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            color: Colors.white, // Changed to white to pop against video
+            letterSpacing: 1.5,
+            shadows: [
+              Shadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          width: 40,
-          height: 3,
-          decoration: BoxDecoration(
+          width: 48,
+          height: 4,
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryLight],
+              colors: [Color(0xFFD4AF37), Color(0xFFAA8022)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.all(Radius.circular(2)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0xFFC29A55),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Text(
-          'SMART TECHNOLOGY SHOPPING',
+          'Smart Technology Shopping',
           style: GoogleFonts.poppins(
-            fontSize: 11,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: Colors.white54,
-            letterSpacing: 3,
+            color: Colors.white.withOpacity(0.8), // Changed to white
+            letterSpacing: 0.5,
           ),
         ),
       ],
@@ -257,19 +203,15 @@ class _LoginPageState extends State<LoginPage>
       width: double.infinity,
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: AppColors.darkCard.withOpacity(0.85),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 40,
-            offset: const Offset(0, 20),
-          ),
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.05),
+            color: Colors.black.withOpacity(
+              0.15,
+            ), // Slightly stronger shadow for video bg
             blurRadius: 20,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -278,7 +220,6 @@ class _LoginPageState extends State<LoginPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header (Centered)
             Center(
               child: Column(
                 children: [
@@ -286,19 +227,19 @@ class _LoginPageState extends State<LoginPage>
                     'Welcome Back',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1A1A1A),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     'Login to continue to TechNest',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
-                      color: Colors.white54,
+                      color: Colors.grey.shade500,
                     ),
                   ),
                 ],
@@ -306,7 +247,6 @@ class _LoginPageState extends State<LoginPage>
             ),
             const SizedBox(height: 32),
 
-            // Email
             _buildTextField(
               controller: emailController,
               label: 'Email Address',
@@ -317,19 +257,16 @@ class _LoginPageState extends State<LoginPage>
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
-
                 if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                     .hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
-
                 return null;
               },
             ),
 
             const SizedBox(height: 20),
 
-            // Password
             _buildTextField(
               controller: passwordController,
               label: 'Password',
@@ -346,7 +283,7 @@ class _LoginPageState extends State<LoginPage>
                   isPasswordVisible
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
-                  color: Colors.white54,
+                  color: Colors.grey.shade500,
                   size: 20,
                 ),
               ),
@@ -354,18 +291,15 @@ class _LoginPageState extends State<LoginPage>
                 if (value == null || value.isEmpty) {
                   return 'Please enter your password';
                 }
-
                 if (value.length < 6) {
                   return 'Password must be at least 6 characters';
                 }
-
                 return null;
               },
             ),
 
             const SizedBox(height: 16),
 
-            // Remember me + forgot password
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -383,13 +317,13 @@ class _LoginPageState extends State<LoginPage>
                         height: 20,
                         decoration: BoxDecoration(
                           color: rememberMe
-                              ? AppColors.primary
+                              ? const Color(0xFFC29A55)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: rememberMe
-                                ? AppColors.primary
-                                : Colors.white30,
+                                ? const Color(0xFFC29A55)
+                                : Colors.grey.shade300,
                             width: 1.5,
                           ),
                         ),
@@ -407,8 +341,8 @@ class _LoginPageState extends State<LoginPage>
                       'Remember me',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.white60,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF2D3436),
                       ),
                     ),
                   ],
@@ -425,7 +359,7 @@ class _LoginPageState extends State<LoginPage>
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primaryLight,
+                      color: const Color(0xFF765B2D),
                     ),
                   ),
                 ),
@@ -434,65 +368,75 @@ class _LoginPageState extends State<LoginPage>
 
             const SizedBox(height: 28),
 
-            // Login button
+            // Gradient Sign In Button
             SizedBox(
               width: double.infinity,
               height: 54,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : login,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  shadowColor: AppColors.primary.withOpacity(0.4),
-                ),
-                child: isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Sign In',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ],
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isLoading ? null : login,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD4AF37), Color(0xFFAA8022)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFC29A55).withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Sign In',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // Divider
             Row(
               children: [
                 Expanded(
-                  child: Divider(
-                    color: Colors.white.withOpacity(0.1),
-                    thickness: 1,
-                  ),
+                  child: Divider(color: Colors.grey.shade200, thickness: 1),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -501,23 +445,19 @@ class _LoginPageState extends State<LoginPage>
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white38,
+                      color: Colors.grey.shade400,
                       letterSpacing: 1,
                     ),
                   ),
                 ),
                 Expanded(
-                  child: Divider(
-                    color: Colors.white.withOpacity(0.1),
-                    thickness: 1,
-                  ),
+                  child: Divider(color: Colors.grey.shade200, thickness: 1),
                 ),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            // Social login
             Row(
               children: [
                 Expanded(
@@ -540,14 +480,13 @@ class _LoginPageState extends State<LoginPage>
 
             const SizedBox(height: 24),
 
-            // Register
             Center(
               child: RichText(
                 text: TextSpan(
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
-                    color: Colors.white60,
+                    color: Colors.grey.shade500,
                   ),
                   children: [
                     const TextSpan(text: "Don't have an account? "),
@@ -555,8 +494,8 @@ class _LoginPageState extends State<LoginPage>
                       text: 'Create Account',
                       style: GoogleFonts.poppins(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryLight,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF765B2D),
                       ),
                     ),
                   ],
@@ -587,7 +526,7 @@ class _LoginPageState extends State<LoginPage>
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Colors.white70,
+            color: const Color(0xFF2D3436),
           ),
         ),
         const SizedBox(height: 8),
@@ -597,40 +536,52 @@ class _LoginPageState extends State<LoginPage>
           obscureText: obscureText,
           style: GoogleFonts.poppins(
             fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: Colors.white,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF2D3436),
           ),
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.white30),
-            prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+            hintStyle: GoogleFonts.poppins(
+              fontSize: 13,
+              color: Colors.grey.shade400,
+            ),
+            prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: const Color(0xFFF6F6F6),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 16,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: Color(0xFFC29A55),
+                width: 1.5,
+              ),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: Color(0xFFE74C3C),
+                width: 1.5,
+              ),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: Color(0xFFE74C3C),
+                width: 1.5,
+              ),
             ),
           ),
         ),
@@ -646,23 +597,30 @@ class _LoginPageState extends State<LoginPage>
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        height: 50,
+        height: 52,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white70, size: 22),
+            Icon(icon, color: const Color(0xFF2D3436), size: 22),
             const SizedBox(width: 8),
             Text(
               label,
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.white70,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF2D3436),
               ),
             ),
           ],
@@ -680,9 +638,9 @@ class _LoginPageState extends State<LoginPage>
             Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(3),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC29A55),
+                borderRadius: BorderRadius.all(Radius.circular(3)),
               ),
             ),
             const SizedBox(width: 8),
@@ -690,14 +648,17 @@ class _LoginPageState extends State<LoginPage>
               'TechNest',
               style: GoogleFonts.poppins(
                 fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Colors.white54,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withOpacity(0.9),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '•',
-              style: GoogleFonts.poppins(fontSize: 11, color: Colors.white30),
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: Colors.white.withOpacity(0.6),
+              ),
             ),
             const SizedBox(width: 8),
             Text(
@@ -705,7 +666,7 @@ class _LoginPageState extends State<LoginPage>
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
-                color: Colors.white38,
+                color: Colors.white.withOpacity(0.7),
               ),
             ),
           ],
@@ -713,7 +674,10 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: 8),
         Text(
           '© 2026 TechNest. All rights reserved.',
-          style: GoogleFonts.poppins(fontSize: 10, color: Colors.white24),
+          style: GoogleFonts.poppins(
+            fontSize: 10,
+            color: Colors.white.withOpacity(0.5),
+          ),
         ),
       ],
     );
