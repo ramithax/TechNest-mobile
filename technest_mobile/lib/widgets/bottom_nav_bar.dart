@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+import '../core/constants/app_colors.dart';
 
 class TechNestBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -15,11 +16,12 @@ class TechNestBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
             offset: const Offset(0, -2),
           ),
         ],
@@ -28,15 +30,15 @@ class TechNestBottomNavBar extends StatelessWidget {
         currentIndex: currentIndex,
         onTap: onTap,
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
-        selectedItemColor: const Color(0xFF1A1A2E),
-        unselectedItemColor: Colors.grey.shade400,
-        selectedLabelStyle: GoogleFonts.poppins(
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textMuted,
+        selectedLabelStyle: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: GoogleFonts.poppins(
+        unselectedLabelStyle: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w400,
         ),
@@ -52,9 +54,19 @@ class TechNestBottomNavBar extends StatelessWidget {
             label: 'Cart',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline, size: 22),
+            activeIcon: Icon(Icons.chat_bubble, size: 22),
+            label: 'AI Chat',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.favorite_border, size: 22),
             activeIcon: Icon(Icons.favorite, size: 22),
             label: 'Pc Builder',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.build_outlined, size: 22),
+            activeIcon: Icon(Icons.build, size: 22),
+            label: 'Repair',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline, size: 22),

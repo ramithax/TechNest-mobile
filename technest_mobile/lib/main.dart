@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import 'core/theme/app_theme.dart';
-import 'screens/auth/login_page.dart';
+import 'navigation/app_router.dart';
+import 'providers/cart_provider.dart';
 
 void main() {
-  runApp(const TechNestApp());
+  runApp(
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => CartProvider())],
+      child: const TechNestApp(),
+    ),
+  );
 }
 
 class TechNestApp extends StatelessWidget {
@@ -13,9 +21,11 @@ class TechNestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'TechNest',
       theme: AppTheme.lightTheme,
-      home: const LoginPage(),
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.light,
+      initialRoute: '/',
+      onGenerateRoute: AppRouter.generateRoute,
     );
   }
 }

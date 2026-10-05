@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:video_player/video_player.dart'; // Added video_player import
+import 'package:video_player/video_player.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../services/auth_service.dart';
-import '../home/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,19 +20,19 @@ class _LoginPageState extends State<LoginPage> {
   bool isPasswordVisible = false;
   bool rememberMe = false;
   bool isLoading = false;
+  bool isGoogleLoading = false;
 
-  // 1. Added Video Controller
   late VideoPlayerController _videoController;
 
   @override
   void initState() {
     super.initState();
 
-    // 2. Initialize Video
     _videoController = VideoPlayerController.asset('assets/clip/loginpage.mp4')
       ..initialize()
           .then((_) {
             if (!mounted) return;
+
             setState(() {
               _videoController
                 ..setLooping(true)
@@ -50,7 +49,7 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
-    _videoController.dispose(); // 3. Dispose Video
+    _videoController.dispose();
     super.dispose();
   }
 
@@ -73,10 +72,7 @@ class _LoginPageState extends State<LoginPage> {
         isLoading = false;
       });
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
+      Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
       if (!mounted) return;
 
@@ -87,7 +83,41 @@ class _LoginPageState extends State<LoginPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: const Color(0xFFE74C3C),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> googleLogin() async {
+    if (isGoogleLoading || isLoading) return;
+
+    setState(() {
+      isGoogleLoading = true;
+    });
+
+    try {
+      await _authService.googleLogin();
+
+      if (!mounted) return;
+
+      setState(() {
+        isGoogleLoading = false;
+      });
+
+      Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isGoogleLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: AppColors.error,
           duration: const Duration(seconds: 3),
         ),
       );
@@ -97,11 +127,9 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Fallback color while video loads
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: AppColors.dark,
       body: Stack(
         children: [
-          // 4. Background Video Layer
           Positioned.fill(
             child: _videoController.value.isInitialized
                 ? FittedBox(
@@ -113,16 +141,14 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   )
                 : const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFC29A55)),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
           ),
 
-          // 5. Overlay Layer (Tuned to 0.45 so video shows but white card pops)
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.45)),
+            child: Container(color: Colors.black.withValues(alpha: 0.55)),
           ),
 
-          // 6. Main Content Layer
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -148,49 +174,34 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildBrandHeader() {
     return Column(
       children: [
-        Text(
+        const Text(
           'TECHNEST',
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w700,
-            color: Colors.white, // Changed to white to pop against video
+            color: Colors.white,
             letterSpacing: 1.5,
             shadows: [
-              Shadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
+              Shadow(color: Colors.black, blurRadius: 10, offset: Offset(0, 4)),
             ],
           ),
         ),
         const SizedBox(height: 8),
         Container(
           width: 48,
-          height: 4,
+          height: 3,
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFD4AF37), Color(0xFFAA8022)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppColors.primary,
             borderRadius: BorderRadius.all(Radius.circular(2)),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0xFFC29A55),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
           ),
         ),
         const SizedBox(height: 12),
         Text(
           'Smart Technology Shopping',
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: Colors.white.withOpacity(0.8), // Changed to white
+            color: Colors.white.withValues(alpha: 0.8),
             letterSpacing: 0.5,
           ),
         ),
@@ -204,12 +215,10 @@ class _LoginPageState extends State<LoginPage> {
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(
-              0.15,
-            ), // Slightly stronger shadow for video bg
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -223,28 +232,29 @@ class _LoginPageState extends State<LoginPage> {
             Center(
               child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'Welcome Back',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 24,
+                    style: TextStyle(
+                      fontSize: 22,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1A1A1A),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Login to continue to TechNest',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
-                      color: Colors.grey.shade500,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
+
             const SizedBox(height: 32),
 
             _buildTextField(
@@ -257,10 +267,12 @@ class _LoginPageState extends State<LoginPage> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
+
                 if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                     .hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
+
                 return null;
               },
             ),
@@ -283,7 +295,7 @@ class _LoginPageState extends State<LoginPage> {
                   isPasswordVisible
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
-                  color: Colors.grey.shade500,
+                  color: AppColors.textSecondary,
                   size: 20,
                 ),
               ),
@@ -291,9 +303,11 @@ class _LoginPageState extends State<LoginPage> {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your password';
                 }
+
                 if (value.length < 6) {
                   return 'Password must be at least 6 characters';
                 }
+
                 return null;
               },
             ),
@@ -317,13 +331,13 @@ class _LoginPageState extends State<LoginPage> {
                         height: 20,
                         decoration: BoxDecoration(
                           color: rememberMe
-                              ? const Color(0xFFC29A55)
+                              ? AppColors.primary
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: rememberMe
-                                ? const Color(0xFFC29A55)
-                                : Colors.grey.shade300,
+                                ? AppColors.primary
+                                : AppColors.border,
                             width: 1.5,
                           ),
                         ),
@@ -337,29 +351,32 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
+                    const Text(
                       'Remember me',
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: const Color(0xFF2D3436),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
                 ),
+
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/forgot-password');
+                  },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: Text(
+                  child: const Text(
                     'Forgot Password?',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF765B2D),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -368,66 +385,50 @@ class _LoginPageState extends State<LoginPage> {
 
             const SizedBox(height: 28),
 
-            // Gradient Sign In Button
             SizedBox(
               width: double.infinity,
-              height: 54,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: isLoading ? null : login,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFD4AF37), Color(0xFFAA8022)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFC29A55).withOpacity(0.4),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Sign In',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                              ],
-                            ),
-                    ),
+              height: 52,
+              child: ElevatedButton(
+                onPressed: isLoading || isGoogleLoading ? null : login,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.dark,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
               ),
             ),
 
@@ -436,73 +437,120 @@ class _LoginPageState extends State<LoginPage> {
             Row(
               children: [
                 Expanded(
-                  child: Divider(color: Colors.grey.shade200, thickness: 1),
+                  child: Divider(color: AppColors.border, thickness: 1),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'OR',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade400,
+                      color: AppColors.textMuted,
                       letterSpacing: 1,
                     ),
                   ),
                 ),
                 Expanded(
-                  child: Divider(color: Colors.grey.shade200, thickness: 1),
+                  child: Divider(color: AppColors.border, thickness: 1),
                 ),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSocialButton(
-                    icon: Icons.g_mobiledata,
-                    label: 'Google',
-                    onPressed: () {},
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildSocialButton(
-                    icon: Icons.apple,
-                    label: 'Apple',
-                    onPressed: () {},
-                  ),
-                ),
-              ],
-            ),
+            _buildGoogleButton(),
 
             const SizedBox(height: 24),
 
             Center(
-              child: RichText(
-                text: TextSpan(
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.grey.shade500,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Don't have an account? ",
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      Navigator.pushNamed(context, '/register');
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      child: Text(
+                        'Create Account',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoogleButton() {
+    return GestureDetector(
+      onTap: isLoading || isGoogleLoading ? null : googleLogin,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: double.infinity,
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: isGoogleLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const TextSpan(text: "Don't have an account? "),
-                    TextSpan(
-                      text: 'Create Account',
-                      style: GoogleFonts.poppins(
+                    Image.asset(
+                      'assets/images/google_logo.png',
+                      width: 22,
+                      height: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Continue with Google',
+                      style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF765B2D),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -523,10 +571,10 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF2D3436),
+            color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -534,98 +582,55 @@ class _LoginPageState extends State<LoginPage> {
           controller: controller,
           keyboardType: keyboardType,
           obscureText: obscureText,
-          style: GoogleFonts.poppins(
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF2D3436),
+            color: AppColors.textPrimary,
           ),
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.poppins(
-              fontSize: 13,
-              color: Colors.grey.shade400,
-            ),
-            prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
+            hintStyle: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: const Color(0xFFF6F6F6),
+            fillColor: AppColors.background,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 16,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(
-                color: Color(0xFFC29A55),
+                color: AppColors.primary,
                 width: 1.5,
               ),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(
-                color: Color(0xFFE74C3C),
+                color: AppColors.error,
                 width: 1.5,
               ),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(
-                color: Color(0xFFE74C3C),
+                color: AppColors.error,
                 width: 1.5,
               ),
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSocialButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF2D3436), size: 22),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF2D3436),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -636,37 +641,37 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               decoration: const BoxDecoration(
-                color: Color(0xFFC29A55),
+                color: AppColors.primary,
                 borderRadius: BorderRadius.all(Radius.circular(3)),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               'TechNest',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '•',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 11,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               'Smart Technology Shopping',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -674,9 +679,9 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 8),
         Text(
           '© 2026 TechNest. All rights reserved.',
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             fontSize: 10,
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
           ),
         ),
       ],
