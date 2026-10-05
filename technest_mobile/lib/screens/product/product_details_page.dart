@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/utils/currency_formatter.dart';
+import '../../models/cart_item.dart';
 import '../../models/product_model.dart';
+import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
-import '../../widgets/bottom_nav_bar.dart';
+import '../checkout/checkout_page.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final int productId;
@@ -21,7 +26,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   bool isLoading = true;
   String? error;
 
-  int _selectedIndex = 0;
+  int _quantity = 1;
 
   @override
   void initState() {
@@ -51,23 +56,33 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
   }
 
-  void _handleBottomNavTap(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  void _increaseQuantity() {
+    if (product == null) return;
 
-    if (index == 0) {
-      Navigator.pop(context);
+    if (_quantity < product!.stockQuantity) {
+      setState(() {
+        _quantity++;
+      });
+    }
+  }
+
+  void _decreaseQuantity() {
+    if (_quantity > 1) {
+      setState(() {
+        _quantity--;
+      });
     }
   }
 
   void _addToCart() {
     if (product == null) return;
 
+    context.read<CartProvider>().addToCart(product!, quantity: _quantity);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '${product!.name} added to cart',
+          '$_quantity x ${product!.name} added to cart',
           style: GoogleFonts.poppins(),
         ),
       ),
@@ -77,12 +92,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   void _buyNow() {
     if (product == null) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Buy Now selected for ${product!.name}',
-          style: GoogleFonts.poppins(),
-        ),
+    final cartItem = CartItem(product: product!, quantity: _quantity);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            CheckoutPage(items: [cartItem], clearCartAfterOrder: false),
       ),
     );
   }
@@ -135,12 +151,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           style: GoogleFonts.poppins(
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF2D3436),
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: true,
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 25),
         child: Column(
@@ -183,9 +198,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                     ),
             ),
-
             const SizedBox(height: 24),
-
             Text(
               item.name,
               style: GoogleFonts.poppins(
@@ -194,9 +207,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 color: const Color(0xFF2D3436),
               ),
             ),
-
             const SizedBox(height: 7),
-
             Text(
               '${item.brand} • ${item.category}',
               style: GoogleFonts.poppins(
@@ -204,23 +215,21 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 color: Colors.grey.shade600,
               ),
             ),
-
             const SizedBox(height: 18),
-
             Row(
               children: [
                 Text(
-                  'Rs. ${item.actualPrice.toStringAsFixed(2)}',
+                  formatPrice(item.actualPrice),
                   style: GoogleFonts.poppins(
                     fontSize: 23,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF765B2D),
+                    color: AppColors.primary,
                   ),
                 ),
                 if (hasDiscount) ...[
                   const SizedBox(width: 12),
                   Text(
-                    'Rs. ${item.labelPrice.toStringAsFixed(2)}',
+                    formatPrice(item.labelPrice),
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       color: Colors.grey.shade500,
@@ -230,9 +239,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ],
               ],
             ),
-
             const SizedBox(height: 14),
-
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
@@ -254,9 +261,62 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ),
               ),
             ),
-
+            if (isInStock) ...[
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Text(
+                    'Quantity',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF2D3436),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: _quantity > 1 ? _decreaseQuantity : null,
+                          icon: const Icon(Icons.remove, size: 18),
+                          color: const Color(0xFF2D3436),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          constraints: const BoxConstraints(),
+                        ),
+                        SizedBox(
+                          width: 35,
+                          child: Text(
+                            '$_quantity',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF2D3436),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _quantity < item.stockQuantity
+                              ? _increaseQuantity
+                              : null,
+                          icon: const Icon(Icons.add, size: 18),
+                          color: const Color(0xFF2D3436),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 28),
-
             Text(
               'Description',
               style: GoogleFonts.poppins(
@@ -265,9 +325,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 color: const Color(0xFF2D3436),
               ),
             ),
-
             const SizedBox(height: 9),
-
             Text(
               item.description,
               style: GoogleFonts.poppins(
@@ -276,9 +334,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 color: Colors.grey.shade700,
               ),
             ),
-
             const SizedBox(height: 30),
-
             Row(
               children: [
                 Expanded(
@@ -287,7 +343,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     child: OutlinedButton(
                       onPressed: isInStock ? _addToCart : null,
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF765B2D)),
+                        side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -297,22 +353,20 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFF765B2D),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: SizedBox(
                     height: 50,
                     child: ElevatedButton(
                       onPressed: isInStock ? _buyNow : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF765B2D),
+                        backgroundColor: AppColors.dark,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -331,15 +385,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
           ],
         ),
-      ),
-
-      bottomNavigationBar: TechNestBottomNavBar(
-        currentIndex: _selectedIndex,
-        onTap: _handleBottomNavTap,
       ),
     );
   }

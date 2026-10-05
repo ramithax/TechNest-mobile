@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../models/product_model.dart';
 import '../../services/product_service.dart';
-import '../../widgets/bottom_nav_bar.dart';
 import '../../widgets/product_card.dart';
 
 class HomePage extends StatefulWidget {
@@ -15,22 +16,49 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
-
   late VideoPlayerController _carouselController;
 
   final ProductService _productService = ProductService();
+  final TextEditingController _searchController = TextEditingController();
 
   List<ProductModel> products = [];
+
   bool isLoadingProducts = true;
+  bool _isChangingPage = false;
+
   String? productError;
 
+  int _currentPage = 1;
+  final int _pageSize = 10;
+  int _totalPages = 1;
+
+  String _searchQuery = '';
+  String? _selectedCategory;
+
+  Timer? _searchDebounce;
+
   final List<Map<String, String>> categories = [
-    {'name': 'Laptops', 'image': 'assets/images/laptop.jpg'},
-    {'name': 'Monitors', 'image': 'assets/images/monitor.jpg'},
-    {'name': 'Motherboards', 'image': 'assets/images/motherboard.jpg'},
-    {'name': 'Graphics Cards', 'image': 'assets/images/gpu.jpg'},
-    {'name': 'Processors', 'image': 'assets/images/proccessor.jpg'},
+    {'name': 'Laptops', 'value': 'Laptop', 'image': 'assets/images/laptop.jpg'},
+    {
+      'name': 'Monitors',
+      'value': 'Monitor',
+      'image': 'assets/images/monitor.jpg',
+    },
+    {
+      'name': 'Motherboards',
+      'value': 'Motherboard',
+      'image': 'assets/images/motherboard.jpg',
+    },
+    {
+      'name': 'Graphics Cards',
+      'value': 'GPU',
+      'image': 'assets/images/gpu.jpg',
+    },
+    {
+      'name': 'Processors',
+      'value': 'Processor',
+      'image': 'assets/images/proccessor.jpg',
+    },
   ];
 
   @override
@@ -54,41 +82,160 @@ class _HomePageState extends State<HomePage> {
                 debugPrint('Carousel video error: $error');
               });
 
-    _loadProducts();
+    _loadProducts(page: 1);
   }
 
-  Future<void> _loadProducts() async {
+  // ============================================================
+  // LOAD PRODUCTS
+  // ============================================================
+
+  Future<void> _loadProducts({required int page}) async {
+    if (_isChangingPage) return;
+
+    setState(() {
+      if (page == 1 && products.isEmpty) {
+        isLoadingProducts = true;
+      } else {
+        _isChangingPage = true;
+      }
+
+      productError = null;
+    });
+
     try {
-      final result = await _productService.getProducts();
+      debugPrint(
+        'Loading products: '
+        'page=$page, '
+        'search=$_searchQuery, '
+        'category=$_selectedCategory',
+      );
+
+      final result = await _productService.getProducts(
+        page: page,
+        pageSize: _pageSize,
+        search: _searchQuery,
+        category: _selectedCategory,
+      );
 
       if (!mounted) return;
 
       setState(() {
-        products = result;
+        products = result.items;
+
+        _currentPage = result.page;
+        _totalPages = result.totalPages;
+
         isLoadingProducts = false;
+        _isChangingPage = false;
+        productError = null;
       });
+
+      debugPrint(
+        'Loaded page ${result.page}: '
+        '${result.items.length} products | '
+        'Total: ${result.totalCount} | '
+        'Total pages: ${result.totalPages}',
+      );
     } catch (e) {
       debugPrint('Product loading error: $e');
 
       if (!mounted) return;
 
       setState(() {
-        productError = 'Failed to load products';
         isLoadingProducts = false;
+        _isChangingPage = false;
+        productError = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
 
+  // ============================================================
+  // SEARCH
+  // ============================================================
+
+  void _onSearchChanged(String value) {
+    _searchQuery = value;
+
+    _searchDebounce?.cancel();
+
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+
+      _loadProducts(page: 1);
+    });
+  }
+
+  // ============================================================
+  // CATEGORY FILTER
+  // ============================================================
+
+  void _selectCategory(String category) {
+    if (_isChangingPage) return;
+
+    setState(() {
+      if (_selectedCategory == category) {
+        _selectedCategory = null;
+      } else {
+        _selectedCategory = category;
+      }
+    });
+
+    _loadProducts(page: 1);
+  }
+
+  // ============================================================
+  // CLEAR FILTERS
+  // ============================================================
+
+  void _clearFilters() {
+    if (_isChangingPage) return;
+
+    _searchDebounce?.cancel();
+    _searchController.clear();
+
+    setState(() {
+      _searchQuery = '';
+      _selectedCategory = null;
+    });
+
+    _loadProducts(page: 1);
+  }
+
+  // ============================================================
+  // CHANGE PAGE
+  // ============================================================
+
+  void _changePage(int page) {
+    if (page < 1 || page > _totalPages) return;
+    if (page == _currentPage) return;
+    if (_isChangingPage) return;
+
+    _loadProducts(page: page);
+  }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
     _carouselController.dispose();
     super.dispose();
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
+    final bool hasActiveFilter =
+        _searchQuery.trim().isNotEmpty || _selectedCategory != null;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -96,26 +243,27 @@ class _HomePageState extends State<HomePage> {
             SliverToBoxAdapter(child: _buildHeader()),
             SliverToBoxAdapter(child: _buildCarousel()),
             SliverToBoxAdapter(child: _buildCategories()),
+            if (hasActiveFilter)
+              SliverToBoxAdapter(child: _buildActiveFilter()),
             SliverToBoxAdapter(
               child: _buildSectionHeader(title: 'Top Selling', showDeal: true),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               sliver: _buildProductsSection(),
             ),
+            if (!isLoadingProducts && productError == null)
+              SliverToBoxAdapter(child: _buildPagination()),
+            const SliverToBoxAdapter(child: SizedBox(height: 30)),
           ],
         ),
       ),
-      bottomNavigationBar: TechNestBottomNavBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-      ),
     );
   }
+
+  // ============================================================
+  // PRODUCTS SECTION
+  // ============================================================
 
   Widget _buildProductsSection() {
     if (isLoadingProducts) {
@@ -123,7 +271,7 @@ class _HomePageState extends State<HomePage> {
         child: Center(
           child: Padding(
             padding: EdgeInsets.all(30),
-            child: CircularProgressIndicator(color: Color(0xFFC29A55)),
+            child: CircularProgressIndicator(color: AppColors.primary),
           ),
         ),
       );
@@ -134,9 +282,38 @@ class _HomePageState extends State<HomePage> {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(30),
-            child: Text(
-              productError!,
-              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 40,
+                  color: Colors.grey,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  productError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _isChangingPage
+                      ? null
+                      : () {
+                          _loadProducts(page: _currentPage);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Try Again'),
+                ),
+              ],
             ),
           ),
         ),
@@ -148,27 +325,308 @@ class _HomePageState extends State<HomePage> {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(30),
-            child: Text(
-              'No products available',
-              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.search_off_rounded,
+                  size: 42,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'No products found',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2D3436),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Try another search or category.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+                const SizedBox(height: 16),
+                if (_searchQuery.isNotEmpty || _selectedCategory != null)
+                  TextButton(
+                    onPressed: _clearFilters,
+                    child: const Text(
+                      'Clear Filters',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
       );
     }
 
-    return SliverGrid(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        return ProductCard(product: products[index]);
-      }, childCount: products.length),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 14,
-        childAspectRatio: 0.67,
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverGrid(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return ProductCard(product: products[index]);
+          }, childCount: products.length),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 14,
+            childAspectRatio: 0.67,
+          ),
+        ),
+        if (_isChangingPage)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // ACTIVE FILTER
+  // ============================================================
+
+  Widget _buildActiveFilter() {
+    String? selectedCategoryName;
+
+    if (_selectedCategory != null) {
+      for (final category in categories) {
+        if (category['value'] == _selectedCategory) {
+          selectedCategoryName = category['name'];
+          break;
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                if (_selectedCategory != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.category_outlined,
+                          size: 15,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          selectedCategoryName ?? _selectedCategory!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_searchQuery.trim().isNotEmpty) ...[
+                  if (_selectedCategory != null) const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_rounded,
+                            size: 15,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              '"$_searchQuery"',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _isChangingPage ? null : _clearFilters,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Clear',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  // ============================================================
+  // PAGINATION
+  // ============================================================
+
+  Widget _buildPagination() {
+    if (_totalPages <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildPaginationButton(
+            icon: Icons.chevron_left_rounded,
+            enabled: _currentPage > 1,
+            onPressed: () {
+              _changePage(_currentPage - 1);
+            },
+          ),
+          const SizedBox(width: 8),
+          ...List.generate(_totalPages, (index) {
+            final page = index + 1;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: _buildPageNumber(page),
+            );
+          }),
+          const SizedBox(width: 8),
+          _buildPaginationButton(
+            icon: Icons.chevron_right_rounded,
+            enabled: _currentPage < _totalPages,
+            onPressed: () {
+              _changePage(_currentPage + 1);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPageNumber(int page) {
+    final bool isSelected = page == _currentPage;
+
+    return GestureDetector(
+      onTap: _isChangingPage
+          ? null
+          : () {
+              _changePage(page);
+            },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+          ),
+          boxShadow: [
+            if (!isSelected)
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+          ],
+        ),
+        child: Text(
+          '$page',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationButton({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: enabled && !_isChangingPage ? onPressed : null,
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.surface : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(
+          icon,
+          size: 22,
+          color: enabled ? AppColors.textPrimary : AppColors.textMuted,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // HEADER
+  // ============================================================
 
   Widget _buildHeader() {
     return Padding(
@@ -183,7 +641,7 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 15,
                     offset: const Offset(0, 4),
                   ),
@@ -200,13 +658,15 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
-                      style: GoogleFonts.poppins(
+                      controller: _searchController,
+                      onChanged: _onSearchChanged,
+                      style: const TextStyle(
                         fontSize: 14,
-                        color: const Color(0xFF2D3436),
+                        color: Color(0xFF2D3436),
                       ),
                       decoration: InputDecoration(
                         hintText: 'Search products...',
-                        hintStyle: GoogleFonts.poppins(
+                        hintStyle: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: 14,
                         ),
@@ -218,6 +678,28 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
+                  if (_searchQuery.isNotEmpty)
+                    IconButton(
+                      onPressed: _isChangingPage
+                          ? null
+                          : () {
+                              _searchDebounce?.cancel();
+                              _searchController.clear();
+
+                              setState(() {
+                                _searchQuery = '';
+                              });
+
+                              _loadProducts(page: 1);
+                            },
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: Colors.grey.shade500,
+                        size: 20,
+                      ),
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(8),
+                    ),
                   Container(
                     width: 1,
                     height: 24,
@@ -225,10 +707,14 @@ class _HomePageState extends State<HomePage> {
                     margin: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      _showFilterInfo();
+                    },
                     icon: Icon(
                       Icons.tune_rounded,
-                      color: Colors.grey.shade600,
+                      color: _selectedCategory != null
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
                       size: 22,
                     ),
                     constraints: const BoxConstraints(),
@@ -250,6 +736,136 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ============================================================
+  // FILTER BUTTON
+  // ============================================================
+
+  void _showFilterInfo() {
+    _showCategoryBottomSheet();
+  }
+
+  void _showCategoryBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Filter by Category',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _selectedCategory == null
+                        ? AppColors.primary
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.apps_rounded,
+                    color: _selectedCategory == null
+                        ? Colors.white
+                        : Colors.grey.shade600,
+                  ),
+                ),
+                title: const Text(
+                  'All Products',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                trailing: _selectedCategory == null
+                    ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                    : null,
+                onTap: () {
+                  Navigator.pop(context);
+
+                  if (_selectedCategory != null) {
+                    setState(() {
+                      _selectedCategory = null;
+                    });
+
+                    _loadProducts(page: 1);
+                  }
+                },
+              ),
+              ...categories.map((category) {
+                final String name = category['name']!;
+                final String value = category['value']!;
+
+                final bool selected = _selectedCategory == value;
+
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(7),
+                      child: Image.asset(category['image']!, fit: BoxFit.cover),
+                    ),
+                  ),
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  trailing: selected
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.primary,
+                        )
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selectCategory(value);
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildHeaderButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -265,7 +881,7 @@ class _HomePageState extends State<HomePage> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 15,
                 offset: const Offset(0, 4),
               ),
@@ -273,7 +889,7 @@ class _HomePageState extends State<HomePage> {
           ),
           child: IconButton(
             onPressed: onTap,
-            icon: Icon(icon, color: const Color(0xFF2D3436), size: 22),
+            icon: Icon(icon, color: AppColors.textPrimary, size: 22),
           ),
         ),
         if (showBadge)
@@ -293,6 +909,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ============================================================
+  // CAROUSEL
+  // ============================================================
+
   Widget _buildCarousel() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -302,7 +922,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -325,11 +945,15 @@ class _HomePageState extends State<HomePage> {
                 ),
               )
             : const Center(
-                child: CircularProgressIndicator(color: Color(0xFFC29A55)),
+                child: CircularProgressIndicator(color: AppColors.primary),
               ),
       ),
     );
   }
+
+  // ============================================================
+  // CATEGORIES
+  // ============================================================
 
   Widget _buildCategories() {
     return Padding(
@@ -350,6 +974,7 @@ class _HomePageState extends State<HomePage> {
               },
               itemBuilder: (context, index) {
                 final category = categories[index];
+
                 return _buildCategoryCard(category);
               },
             ),
@@ -360,46 +985,71 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCategoryCard(Map<String, String> category) {
-    return SizedBox(
-      width: 82,
-      child: Column(
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+    final String name = category['name']!;
+    final String value = category['value']!;
+
+    final bool isSelected = _selectedCategory == value;
+
+    return GestureDetector(
+      onTap: _isChangingPage
+          ? null
+          : () {
+              _selectCategory(value);
+            },
+      child: SizedBox(
+        width: 82,
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 72,
+              height: 72,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primaryMuted : AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.border,
+                  width: isSelected ? 2 : 1,
                 ),
-              ],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(category['image']!, fit: BoxFit.cover),
+              ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(category['image']!, fit: BoxFit.cover),
+            const SizedBox(height: 10),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            category['name']!,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF2D3436),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+  // ============================================================
+  // SECTION HEADER
+  // ============================================================
 
   Widget _buildSectionHeader({required String title, required bool showDeal}) {
     return Padding(
@@ -408,10 +1058,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             title,
-            style: GoogleFonts.poppins(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF1A1A1A),
+              color: Color(0xFF1A1A1A),
             ),
           ),
           if (showDeal) ...[
@@ -419,23 +1069,12 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFD4AF37), Color(0xFFAA8022)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: AppColors.primary,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFC29A55).withOpacity(0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
-              child: Text(
+              child: const Text(
                 'SUPER DEAL',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -452,22 +1091,14 @@ class _HomePageState extends State<HomePage> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'See all',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF765B2D),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                const Icon(
+                SizedBox(width: 2),
+                Icon(
                   Icons.arrow_forward_ios,
                   size: 10,
-                  color: Color(0xFF765B2D),
+                  color: AppColors.primary,
                 ),
               ],
             ),
